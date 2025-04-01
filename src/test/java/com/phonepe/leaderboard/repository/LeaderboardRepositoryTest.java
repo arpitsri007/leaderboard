@@ -1,6 +1,7 @@
 package com.phonepe.leaderboard.repository;
 
 import com.phonepe.leaderboard.model.Leaderboard;
+import com.phonepe.leaderboard.util.TimeProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,10 +14,25 @@ public class LeaderboardRepositoryTest {
     private static final String GAME_ID = "test-game";
     private static final long START_TIME = 1000L;
     private static final long END_TIME = 2000L;
+    private MockTimeProvider mockTimeProvider;
+
+    private static class MockTimeProvider implements TimeProvider {
+        private long currentTime = START_TIME + 500;
+
+        @Override
+        public long getCurrentTimeInSeconds() {
+            return currentTime;
+        }
+
+        public void setCurrentTime(long time) {
+            this.currentTime = time;
+        }
+    }
 
     @BeforeEach
     void setUp() {
-        repository = new LeaderboardRepository();
+        mockTimeProvider = new MockTimeProvider();
+        repository = new LeaderboardRepository(mockTimeProvider);
     }
 
     @Test
@@ -52,6 +68,9 @@ public class LeaderboardRepositoryTest {
         // Create active and inactive leaderboards
         Leaderboard activeLeaderboard = repository.createLeaderboard(GAME_ID, START_TIME, END_TIME);
         Leaderboard inactiveLeaderboard = repository.createLeaderboard(GAME_ID, START_TIME - 1000, START_TIME - 1);
+        
+        // Set time to be between START_TIME and END_TIME
+        mockTimeProvider.setCurrentTime(START_TIME + 100);
         
         List<Leaderboard> activeLeaderboards = repository.getActiveLeaderboardsForGame(GAME_ID);
         

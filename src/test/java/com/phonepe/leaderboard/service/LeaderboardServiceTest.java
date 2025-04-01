@@ -1,5 +1,10 @@
 package com.phonepe.leaderboard.service;
 
+import com.phonepe.leaderboard.config.LeaderboardConfig;
+import com.phonepe.leaderboard.exception.GameNotSupportedException;
+import com.phonepe.leaderboard.exception.InvalidScoreException;
+import com.phonepe.leaderboard.util.TimeProvider;
+import com.phonepe.leaderboard.validation.RangeScoreValidationStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -14,9 +19,25 @@ public class LeaderboardServiceTest {
     private static final int START_TIME = 1000;
     private static final int END_TIME = 2000;
 
+    private static class MockTimeProvider implements TimeProvider {
+        private long currentTime = START_TIME + 500;
+
+        @Override
+        public long getCurrentTimeInSeconds() {
+            return currentTime;
+        }
+
+        public void setCurrentTime(long time) {
+            this.currentTime = time;
+        }
+    }
+
     @BeforeEach
     void setUp() {
-        service = new LeaderboardService();
+        service = new LeaderboardService(
+            new MockTimeProvider(),
+            new RangeScoreValidationStrategy(LeaderboardConfig.MIN_SCORE, LeaderboardConfig.MAX_SCORE)
+        );
         service.addSupportedGame(GAME_ID);
     }
 
@@ -39,7 +60,7 @@ public class LeaderboardServiceTest {
 
     @Test
     void testCreateLeaderboardForUnsupportedGame() {
-        assertThrows(IllegalArgumentException.class, () -> 
+        assertThrows(GameNotSupportedException.class, () -> 
             service.createLeaderboard("unsupported-game", START_TIME, END_TIME)
         );
     }
@@ -62,18 +83,18 @@ public class LeaderboardServiceTest {
 
     @Test
     void testSubmitScoreForUnsupportedGame() {
-        assertThrows(IllegalArgumentException.class, () -> 
+        assertThrows(GameNotSupportedException.class, () -> 
             service.submitScore("unsupported-game", USER_ID, 1000)
         );
     }
 
     @Test
     void testSubmitInvalidScore() {
-        assertThrows(IllegalArgumentException.class, () -> 
-            service.submitScore(GAME_ID, USER_ID, -1)
+        assertThrows(InvalidScoreException.class, () -> 
+            service.submitScore(GAME_ID, USER_ID, LeaderboardConfig.MIN_SCORE - 1)
         );
-        assertThrows(IllegalArgumentException.class, () -> 
-            service.submitScore(GAME_ID, USER_ID, 1_000_000_001)
+        assertThrows(InvalidScoreException.class, () -> 
+            service.submitScore(GAME_ID, USER_ID, LeaderboardConfig.MAX_SCORE + 1)
         );
     }
 
@@ -136,5 +157,12 @@ public class LeaderboardServiceTest {
         
         List<Map.Entry<String, Integer>> prevPlayers = service.listPlayersPrev(GAME_ID, leaderboardId, "non-existent", 1);
         assertTrue(prevPlayers.isEmpty());
+    }
+
+    @Test
+    void testGetNonExistentLeaderboard() {
+        assertThrows(IllegalArgumentException.class, () -> 
+            service.getLeaderboard("non-existent-id")
+        );
     }
 } 

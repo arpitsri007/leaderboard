@@ -1,17 +1,23 @@
 package com.phonepe.leaderboard.service;
 
+import com.phonepe.leaderboard.exception.GameNotSupportedException;
+import com.phonepe.leaderboard.exception.InvalidScoreException;
 import com.phonepe.leaderboard.model.Leaderboard;
 import com.phonepe.leaderboard.repository.LeaderboardRepository;
+import com.phonepe.leaderboard.util.TimeProvider;
+import com.phonepe.leaderboard.validation.ScoreValidationStrategy;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class LeaderboardService {
     private final LeaderboardRepository repository;
     private final Set<String> supportedGames;
+    private final ScoreValidationStrategy scoreValidationStrategy;
 
-    public LeaderboardService() {
-        this.repository = new LeaderboardRepository();
+    public LeaderboardService(TimeProvider timeProvider, ScoreValidationStrategy scoreValidationStrategy) {
+        this.repository = new LeaderboardRepository(timeProvider);
         this.supportedGames = new HashSet<>();
+        this.scoreValidationStrategy = scoreValidationStrategy;
     }
 
     public void addSupportedGame(String gameId) {
@@ -24,7 +30,7 @@ public class LeaderboardService {
 
     public String createLeaderboard(String gameId, int startEpochSeconds, int endEpochSeconds) {
         if (!supportedGames.contains(gameId)) {
-            throw new IllegalArgumentException("Game not supported: " + gameId);
+            throw new GameNotSupportedException("Game not supported: " + gameId);
         }
         
         if (startEpochSeconds >= endEpochSeconds) {
@@ -45,11 +51,11 @@ public class LeaderboardService {
 
     public void submitScore(String gameId, String userId, int score) {
         if (!supportedGames.contains(gameId)) {
-            throw new IllegalArgumentException("Game not supported: " + gameId);
+            throw new GameNotSupportedException("Game not supported: " + gameId);
         }
 
-        if (score < 0 || score > 1_000_000_000) {
-            throw new IllegalArgumentException("Score must be between 0 and 1 billion");
+        if (!scoreValidationStrategy.isValid(score)) {
+            throw new InvalidScoreException(scoreValidationStrategy.getErrorMessage());
         }
 
         List<Leaderboard> activeLeaderboards = repository.getActiveLeaderboardsForGame(gameId);

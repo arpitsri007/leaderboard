@@ -1,37 +1,43 @@
 package com.phonepe.leaderboard;
 
+import com.phonepe.leaderboard.config.LeaderboardConfig;
 import com.phonepe.leaderboard.service.LeaderboardService;
+import com.phonepe.leaderboard.util.SystemTimeProvider;
+import com.phonepe.leaderboard.validation.RangeScoreValidationStrategy;
 import java.util.List;
 import java.util.Map;
 
 public class LeaderboardDemo {
     public static void main(String[] args) {
-        LeaderboardService service = new LeaderboardService();
+        LeaderboardService service = new LeaderboardService(
+            new SystemTimeProvider(),
+            new RangeScoreValidationStrategy(LeaderboardConfig.MIN_SCORE, LeaderboardConfig.MAX_SCORE)
+        );
         
         // Add supported games
-        service.addSupportedGame("game1");
-        service.addSupportedGame("game2");
+        service.addSupportedGame("PUBG_MOBILE");
+        service.addSupportedGame("CRICKET");
         
-        // Create a daily leaderboard for game1
+        // Create a daily leaderboard for PUBG Mobile
         int currentTime = (int)(System.currentTimeMillis() / 1000);
-        String leaderboardId = service.createLeaderboard("game1", currentTime, currentTime + 86400); // 24 hours
+        String leaderboardId = service.createLeaderboard("PUBG_MOBILE", currentTime, currentTime + 86400); // 24 hours
         
-        // Submit some scores
-        service.submitScore("game1", "user1", 1000);
-        service.submitScore("game1", "user2", 2000);
-        service.submitScore("game1", "user3", 1500);
-        service.submitScore("game1", "user1", 2500);
-        service.submitScore("game1", "user2", 1800); // This will not update user1's score
+   
+        service.submitScore("PUBG_MOBILE", "user1", 1000);
+        service.submitScore("PUBG_MOBILE", "user2", 2000);
+        service.submitScore("PUBG_MOBILE", "user3", 1500);
+        service.submitScore("PUBG_MOBILE", "user1", 2500);
+        service.submitScore("PUBG_MOBILE", "user2", 1800); // This will not update user1's score
         
-        // Get the full leaderboard
+
         Map<String, Integer> leaderboard = service.getLeaderboard(leaderboardId);
         System.out.println("Full Leaderboard:");
         leaderboard.forEach((userId, score) -> System.out.println(userId + ": " + score));
         
         // Get players around user2
         System.out.println("\nPlayers around user2:");
-        List<Map.Entry<String, Integer>> nextPlayers = service.listPlayersNext("game1", leaderboardId, "user2", 2);
-        List<Map.Entry<String, Integer>> prevPlayers = service.listPlayersPrev("game1", leaderboardId, "user2", 2);
+        List<Map.Entry<String, Integer>> nextPlayers = service.listPlayersNext("PUBG_MOBILE", leaderboardId, "user2", 2);
+        List<Map.Entry<String, Integer>> prevPlayers = service.listPlayersPrev("PUBG_MOBILE", leaderboardId, "user2", 2);
         
         System.out.println("Previous players:");
         prevPlayers.forEach(entry -> System.out.println(entry.getKey() + ": " + entry.getValue()));

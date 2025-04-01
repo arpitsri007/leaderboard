@@ -1,5 +1,6 @@
 package com.phonepe.leaderboard.model;
 
+import com.phonepe.leaderboard.util.TimeProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,10 +14,31 @@ public class LeaderboardTest {
     private static final String GAME_ID = "test-game";
     private static final long START_TIME = 1000L;
     private static final long END_TIME = 2000L;
+    private MockTimeProvider mockTimeProvider;
+
+    private static class MockTimeProvider implements TimeProvider {
+        private long currentTime = START_TIME + 500;
+
+        @Override
+        public long getCurrentTimeInSeconds() {
+            return currentTime;
+        }
+
+        public void setCurrentTime(long time) {
+            this.currentTime = time;
+        }
+    }
 
     @BeforeEach
     void setUp() {
-        leaderboard = new Leaderboard(LEADERBOARD_ID, GAME_ID, START_TIME, END_TIME);
+        mockTimeProvider = new MockTimeProvider();
+        leaderboard = new Leaderboard.Builder()
+                .id(LEADERBOARD_ID)
+                .gameId(GAME_ID)
+                .startTime(START_TIME)
+                .endTime(END_TIME)
+                .timeProvider(mockTimeProvider)
+                .build();
     }
 
     @Test
@@ -30,8 +52,17 @@ public class LeaderboardTest {
     }
 
     @Test
+    void testBuilderWithMissingRequiredFields() {
+        assertThrows(IllegalStateException.class, () -> 
+            new Leaderboard.Builder()
+                .id(LEADERBOARD_ID)
+                .build()
+        );
+    }
+
+    @Test
     void testUpdateScore() {
-        // Test first score submission
+        // Test initial score update
         leaderboard.updateScore("user1", 1000);
         assertEquals(1000, leaderboard.getUserScores().get("user1"));
         assertEquals("user1", leaderboard.getScoreToUser().get(1000));
@@ -70,15 +101,49 @@ public class LeaderboardTest {
     @Test
     void testIsActive() {
         // Mock current time to be within the leaderboard period
-        long currentTime = 1500L;
+        mockTimeProvider.setCurrentTime(1500L);
         assertTrue(leaderboard.isActive());
 
         // Mock current time to be before start time
-        currentTime = 500L;
+        mockTimeProvider.setCurrentTime(500L);
         assertFalse(leaderboard.isActive());
 
         // Mock current time to be after end time
-        currentTime = 2500L;
+        mockTimeProvider.setCurrentTime(2500L);
         assertFalse(leaderboard.isActive());
+
+        // Mock current time to be exactly at start time
+        mockTimeProvider.setCurrentTime(START_TIME);
+        assertTrue(leaderboard.isActive());
+
+        // Mock current time to be exactly at end time
+        mockTimeProvider.setCurrentTime(END_TIME);
+        assertTrue(leaderboard.isActive());
+    }
+
+    @Test
+    void testConcurrentScoreUpdates() throws InterruptedException {
+        int numThreads = 10;
+        int numUpdatesPerThread = 100;
+        Thread[] threads = new Thread[numThreads];
+
+        for (int i = 0; i < numThreads; i++) {
+            final int threadId = i;
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < numUpdatesPerThread; j++) {
+                    leaderboard.updateScore("user" + threadId, j);
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        // Verify each user has their highest score
+        for (int i = 0; i < numThreads; i++) {
+            assertEquals(numUpdatesPerThread - 1, leaderboard.getUserScores().get("user" + i));
+        }
     }
 } 
