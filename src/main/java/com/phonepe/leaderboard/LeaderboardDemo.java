@@ -14,11 +14,9 @@ public class LeaderboardDemo {
             new RangeScoreValidationStrategy(LeaderboardConfig.MIN_SCORE, LeaderboardConfig.MAX_SCORE)
         );
         
-        // Add supported games
         service.addSupportedGame("PUBG_MOBILE");
         service.addSupportedGame("CRICKET");
         
-        // Create a daily leaderboard for PUBG Mobile
         int currentTime = (int)(System.currentTimeMillis() / 1000);
         String leaderboardId = service.createLeaderboard("PUBG_MOBILE", currentTime, currentTime + 86400); // 24 hours
         

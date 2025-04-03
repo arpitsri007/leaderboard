@@ -27,9 +27,9 @@ public class LeaderboardServiceTest {
             return currentTime;
         }
 
-        public void setCurrentTime(long time) {
-            this.currentTime = time;
-        }
+//        public void setCurrentTime(long time) {
+//            this.currentTime = time;
+//        }
     }
 
     @BeforeEach

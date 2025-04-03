@@ -70,17 +70,26 @@ public class LeaderboardService {
             throw new IllegalArgumentException("Leaderboard not found: " + leaderboardId);
         }
 
-        TreeMap<Integer, String> scoreToUser = leaderboard.getScoreToUser();
+        TreeMap<Integer, Set<String>> scoreToUser = leaderboard.getScoreToUser();
         Integer userScore = leaderboard.getUserScores().get(userId);
         if (userScore == null) {
             return new ArrayList<>();
         }
 
-        return scoreToUser.entrySet().stream()
-                .filter(entry -> entry.getKey() < userScore)
-                .limit(nPlayers)
-                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getValue(), entry.getKey()))
-                .collect(Collectors.toList());
+        // 100 - [user1, user2, user3]
+        // userscore - 100
+
+        List<Map.Entry<String, Integer>> result = new ArrayList<>();
+        for (Map.Entry<Integer, Set<String>> entry : scoreToUser.entrySet()) {
+            if (entry.getKey() < userScore) {
+                for (String user : entry.getValue()) {
+                    if (result.size() >= nPlayers) break;
+                    result.add(new AbstractMap.SimpleEntry<>(user, entry.getKey()));
+                }
+            }
+            if (result.size() >= nPlayers) break;
+        }
+        return result;
     }
 
     public List<Map.Entry<String, Integer>> listPlayersPrev(String gameId, String leaderboardId, String userId, int nPlayers) {
@@ -89,16 +98,31 @@ public class LeaderboardService {
             throw new IllegalArgumentException("Leaderboard not found: " + leaderboardId);
         }
 
-        TreeMap<Integer, String> scoreToUser = leaderboard.getScoreToUser();
+        TreeMap<Integer, Set<String>> scoreToUser = leaderboard.getScoreToUser();
         Integer userScore = leaderboard.getUserScores().get(userId);
         if (userScore == null) {
-            return new ArrayList<>();
+            return new ArrayList<>(); // User not found on leaderboard
         }
 
-        return scoreToUser.entrySet().stream()
-                .filter(entry -> entry.getKey() > userScore)
-                .limit(nPlayers)
-                .map(entry -> new AbstractMap.SimpleEntry<>(entry.getValue(), entry.getKey()))
-                .collect(Collectors.toList());
+        List<Map.Entry<String, Integer>> allHigherPlayers = new ArrayList<>();
+        // scoreToUser iterates from highest score to lowest
+        for (Map.Entry<Integer, Set<String>> entry : scoreToUser.entrySet()) {
+            if (entry.getKey() > userScore) {
+                for (String user : entry.getValue()) {
+                    // Add all users with scores higher than the target user
+                    allHigherPlayers.add(new AbstractMap.SimpleEntry<>(user, entry.getKey()));
+                }
+            } else {
+                // Since the map is sorted descending, we can stop once we reach scores <= userScore
+                break;
+            }
+        }
+
+        // Reverse the list to sort from just-above-userScore upwards
+        Collections.reverse(allHigherPlayers);
+
+        // Return the first nPlayers (the page immediately preceding the user)
+        int endIndex = Math.min(nPlayers, allHigherPlayers.size());
+        return allHigherPlayers.subList(0, endIndex);
     }
 } 

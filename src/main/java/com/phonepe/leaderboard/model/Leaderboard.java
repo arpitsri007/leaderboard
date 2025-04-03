@@ -3,6 +3,8 @@ package com.phonepe.leaderboard.model;
 import com.phonepe.leaderboard.util.TimeProvider;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Leaderboard {
@@ -11,7 +13,7 @@ public class Leaderboard {
     private final long startTime;
     private final long endTime;
     private final Map<String, Integer> userScores; // userId -> score
-    private final TreeMap<Integer, String> scoreToUser; // score -> userId (for efficient ranking)
+    private final TreeMap<Integer, Set<String>> scoreToUser; // score -> Set of userIds (for efficient ranking)
     private final TimeProvider timeProvider;
 
     private Leaderboard(Builder builder) {
@@ -85,22 +87,42 @@ public class Leaderboard {
         return currentTime >= startTime && currentTime <= endTime;
     }
 
-    public synchronized void updateScore(String userId, int score) {
-        Integer currentScore = userScores.get(userId);
-        if (currentScore == null || score > currentScore) {
-            if (currentScore != null) {
-                scoreToUser.remove(currentScore);
+    public void updateScore(String userId, int score) {
+        // logging
+
+        synchronized (this) {
+            Integer currentScore = userScores.get(userId);
+            if (currentScore == null || score > currentScore) {
+                if (currentScore != null) {
+                    // Remove user from old score's set
+                    Set<String> usersAtScore = scoreToUser.get(currentScore);
+                    if (usersAtScore != null) {
+                        usersAtScore.remove(userId);
+                        if (usersAtScore.isEmpty()) {
+                            scoreToUser.remove(currentScore);
+                        }
+                    }
+                }
+
+                userScores.put(userId, score);
+                scoreToUser.computeIfAbsent(score, k -> new HashSet<>()).add(userId);
             }
-            userScores.put(userId, score);
-            scoreToUser.put(score, userId);
         }
+
+        // score 100 - user1
+        // thread1 - score 150 - user1
+        // thread2- score 100 - user1
+
+
+        // notify
     }
+    
 
     public Map<String, Integer> getUserScores() {
         return userScores;
     }
 
-    public TreeMap<Integer, String> getScoreToUser() {
+    public TreeMap<Integer, Set<String>> getScoreToUser() {
         return scoreToUser;
     }
 } 

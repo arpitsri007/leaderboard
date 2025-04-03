@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.Set;
 
 public class LeaderboardTest {
     private Leaderboard leaderboard;
@@ -91,11 +92,14 @@ public class LeaderboardTest {
         assertEquals(2000, userScores.get("user2"));
         assertEquals(1500, userScores.get("user3"));
 
-        TreeMap<Integer, String> scoreToUser = leaderboard.getScoreToUser();
+        TreeMap<Integer, Set<String>> scoreToUser = leaderboard.getScoreToUser();
         assertEquals(3, scoreToUser.size());
-        assertEquals("user2", scoreToUser.get(2000));
-        assertEquals("user3", scoreToUser.get(1500));
-        assertEquals("user1", scoreToUser.get(1000));
+        assertEquals(1, scoreToUser.get(2000).size());
+        assertEquals(1, scoreToUser.get(1500).size());
+        assertEquals(1, scoreToUser.get(1000).size());
+        assertTrue(scoreToUser.get(2000).contains("user2"));
+        assertTrue(scoreToUser.get(1500).contains("user3"));
+        assertTrue(scoreToUser.get(1000).contains("user1"));
     }
 
     @Test
@@ -122,6 +126,54 @@ public class LeaderboardTest {
     }
 
     @Test
+    void testMultipleUsersSameScore() {
+        // Test multiple users with same score
+        leaderboard.updateScore("user1", 1000);
+        leaderboard.updateScore("user2", 1000);
+        leaderboard.updateScore("user3", 1000);
+
+        Map<String, Integer> userScores = leaderboard.getUserScores();
+        assertEquals(3, userScores.size());
+        assertEquals(1000, userScores.get("user1"));
+        assertEquals(1000, userScores.get("user2"));
+        assertEquals(1000, userScores.get("user3"));
+
+        TreeMap<Integer, Set<String>> scoreToUser = leaderboard.getScoreToUser();
+        assertEquals(1, scoreToUser.size());
+        Set<String> usersAtScore = scoreToUser.get(1000);
+        assertNotNull(usersAtScore);
+        assertEquals(3, usersAtScore.size());
+        assertTrue(usersAtScore.contains("user1"));
+        assertTrue(usersAtScore.contains("user2"));
+        assertTrue(usersAtScore.contains("user3"));
+    }
+
+    @Test
+    void testUpdateScoreWithMultipleUsers() {
+        // Set up initial scores
+        leaderboard.updateScore("user1", 1000);
+        leaderboard.updateScore("user2", 1000);
+        leaderboard.updateScore("user3", 2000);
+
+        // Verify initial state
+        TreeMap<Integer, Set<String>> scoreToUser = leaderboard.getScoreToUser();
+        assertEquals(2, scoreToUser.size());
+        assertEquals(2, scoreToUser.get(1000).size());
+        assertEquals(1, scoreToUser.get(2000).size());
+
+        // Update user1's score
+        leaderboard.updateScore("user1", 2000);
+        
+        // Verify user1 moved to higher score
+        assertEquals(2, scoreToUser.size());
+        assertEquals(1, scoreToUser.get(1000).size());
+        assertEquals(2, scoreToUser.get(2000).size());
+        assertTrue(scoreToUser.get(2000).contains("user1"));
+        assertTrue(scoreToUser.get(2000).contains("user3"));
+        assertTrue(scoreToUser.get(1000).contains("user2"));
+    }
+
+    @Test
     void testConcurrentScoreUpdates() throws InterruptedException {
         int numThreads = 10;
         int numUpdatesPerThread = 100;
@@ -144,6 +196,40 @@ public class LeaderboardTest {
         // Verify each user has their highest score
         for (int i = 0; i < numThreads; i++) {
             assertEquals(numUpdatesPerThread - 1, leaderboard.getUserScores().get("user" + i));
+        }
+    }
+
+    @Test
+    void testConcurrentScoreUpdatesWithSameScore() throws InterruptedException {
+        int numThreads = 10;
+        int numUpdatesPerThread = 100;
+        Thread[] threads = new Thread[numThreads];
+
+        for (int i = 0; i < numThreads; i++) {
+            final int threadId = i;
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < numUpdatesPerThread; j++) {
+                    leaderboard.updateScore("user" + threadId, j);
+                }
+            });
+            threads[i].start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        // Verify each user has their highest score
+        for (int i = 0; i < numThreads; i++) {
+            assertEquals(numUpdatesPerThread - 1, leaderboard.getUserScores().get("user" + i));
+        }
+
+        // Verify all users with highest score are in the set
+        TreeMap<Integer, Set<String>> scoreToUser = leaderboard.getScoreToUser();
+        Set<String> usersAtHighestScore = scoreToUser.get(numUpdatesPerThread - 1);
+        assertEquals(numThreads, usersAtHighestScore.size());
+        for (int i = 0; i < numThreads; i++) {
+            assertTrue(usersAtHighestScore.contains("user" + i));
         }
     }
 } 

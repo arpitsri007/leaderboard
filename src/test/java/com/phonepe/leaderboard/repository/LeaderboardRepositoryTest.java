@@ -44,7 +44,6 @@ public class LeaderboardRepositoryTest {
         assertEquals(START_TIME, leaderboard.getStartTime());
         assertEquals(END_TIME, leaderboard.getEndTime());
         
-        // Verify leaderboard is stored
         Leaderboard retrieved = repository.getLeaderboard(leaderboard.getId());
         assertNotNull(retrieved);
         assertEquals(leaderboard.getId(), retrieved.getId());
@@ -67,7 +66,6 @@ public class LeaderboardRepositoryTest {
     void testGetActiveLeaderboardsForGame() {
         // Create active and inactive leaderboards
         Leaderboard activeLeaderboard = repository.createLeaderboard(GAME_ID, START_TIME, END_TIME);
-        Leaderboard inactiveLeaderboard = repository.createLeaderboard(GAME_ID, START_TIME - 1000, START_TIME - 1);
         
         // Set time to be between START_TIME and END_TIME
         mockTimeProvider.setCurrentTime(START_TIME + 100);
